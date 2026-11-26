@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 /* ============================================================
    ✏️  EDIT ONLY THIS BLOCK
@@ -10,6 +10,18 @@ import React, { useEffect, useMemo, useState } from "react";
 const CONFIG = {
   name: "Babuu..",
   from: "Shalini",
+
+  // 0) BIRTHDAY DATE + COUNTDOWN (first screen)
+  birthday: { day: 28, month: 11, label: "28 November" }, // month: 1-12
+  lockUntilBirthday: false, // true = "Start" button stays locked until the birthday arrives 🔒
+  countdownTitle: "Counting down to the big day",
+
+  // 0b) SONG (first screen + floating button on every screen)
+  //     Put your mp3 inside the /public folder, e.g. /public/birthday-song.mp3
+  song: {
+    src: "/inna-pyar.mp3",
+    title: "Happy Birthday 💖",
+  },
 
   // 1) QUESTION SCREENS (curved text + image + buttons)
   asks: [
@@ -53,15 +65,16 @@ const CONFIG = {
     fallback: "🥰",
   },
 
-  // 3b) GIFT 2 → memories screen (5 photos hanging on a string)
+  // 3b) GIFT 2 → memories screen (photos hanging on a string)
   memories: {
     title: "MEMORIES",
     photos: [
-      { src: "", fallback: "📸" },
-      { src: "", fallback: "👯" },
-      { src: "", fallback: "🥰" },
-      { src: "", fallback: "🎀" },
-      { src: "", fallback: "🌸" },
+      { src: "/shalini-memeories/1.jpeg", fallback: "📸" },
+      { src: "/shalini-memeories/2.jpeg", fallback: "👯" },
+      { src: "/shalini-memeories/3.jpeg", fallback: "🥰" },
+      { src: "/shalini-memeories/4.jpeg", fallback: "🎀" },
+      { src: "/shalini-memeories/5.jpeg", fallback: "🌸" },
+      { src: "/shalini-memeories/6.jpeg", fallback: "🌸" },
     ],
   },
 
@@ -70,7 +83,7 @@ const CONFIG = {
     top: "Make a wish & blow the candles!",
   },
 
-  // 4) FINAL MESSAGE (opens after all 3 gifts are opened)
+  // 4) FINAL LETTER (opens after all 3 gifts are opened)
   message:
     "Today is all about YOU! Thank you for being the person who makes every day brighter. I hope this year brings you endless smiles, big wins and all the happiness you deserve. 💖",
   wishes: [
@@ -257,16 +270,44 @@ const useTypewriter = (text, speed = 35) => {
   return out;
 };
 
+/* ---------- Countdown hook (to the next 28 November) ---------- */
+
+const useCountdown = () => {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const { day, month } = CONFIG.birthday;
+  const d = new Date(now);
+  let start = new Date(d.getFullYear(), month - 1, day); // birthday 00:00 this year
+  const end = new Date(d.getFullYear(), month - 1, day + 1); // end of birthday
+  const isBirthday = d >= start && d < end;
+  if (d >= end) start = new Date(d.getFullYear() + 1, month - 1, day); // already passed → next year
+
+  const diff = isBirthday ? 0 : Math.max(0, start.getTime() - d.getTime());
+  return {
+    isBirthday,
+    days: Math.floor(diff / 86400000),
+    hours: Math.floor((diff / 3600000) % 24),
+    mins: Math.floor((diff / 60000) % 60),
+    secs: Math.floor((diff / 1000) % 60),
+  };
+};
+
 /* ---------- Red pill button ---------- */
 
-const PillButton = ({ children, onClick, onPointerEnter, style }) => (
+const PillButton = ({ children, onClick, onPointerEnter, style, disabled }) => (
   <button
     onClick={onClick}
     onPointerEnter={onPointerEnter}
     style={style}
+    disabled={disabled}
     className="bw-font relative min-w-[105px] rounded-full bg-red-600 px-6 py-2 text-xl font-bold tracking-wide text-white
       shadow-[0_5px_0_#991b1b] transition-transform duration-200 hover:scale-105 active:translate-y-1
-      active:shadow-[0_2px_0_#991b1b] sm:min-w-[140px] sm:px-8 sm:py-2.5 sm:text-3xl"
+      active:shadow-[0_2px_0_#991b1b] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100
+      sm:min-w-[140px] sm:px-8 sm:py-2.5 sm:text-3xl"
   >
     <span className="pointer-events-none absolute left-3 top-1.5 h-2 w-4 rounded-full bg-white/40 sm:left-4 sm:top-2" />
     <span className="underline decoration-2 underline-offset-4">{children}</span>
@@ -282,6 +323,84 @@ const BackButton = ({ onClick }) => (
     ← Back to gifts
   </button>
 );
+
+/* ---------- Song: floating button (all screens) ---------- */
+
+const SongFloat = ({ playing, onToggle }) => (
+  <button
+    onClick={onToggle}
+    aria-label={playing ? "Pause song" : "Play song"}
+    title={CONFIG.song.title}
+    className="fixed right-3 top-3 z-40 grid h-12 w-12 place-items-center rounded-full border-2 border-white bg-red-600 text-2xl
+      text-white shadow-lg transition hover:scale-110 active:scale-95 sm:right-5 sm:top-5 sm:h-14 sm:w-14"
+  >
+    <span className={playing ? "bw-spin" : ""}>{playing ? "🎵" : "🔇"}</span>
+  </button>
+);
+
+/* ---------- Step 0: countdown + song ---------- */
+
+const CountTile = ({ value, label }) => (
+  <div className="bw-gingham rounded-2xl p-1.5 shadow-xl">
+    <div className="flex w-[3.9rem] flex-col items-center rounded-xl bg-red-600 py-2.5 sm:w-24 sm:py-4">
+      <span key={value} className="bw-font bw-pop text-3xl font-bold leading-none text-white sm:text-5xl">
+        {String(value).padStart(2, "0")}
+      </span>
+      <span className="bw-font mt-1 text-[11px] text-red-100 sm:text-base">{label}</span>
+    </div>
+  </div>
+);
+
+const CountdownStep = ({ onStart, song }) => {
+  const { days, hours, mins, secs, isBirthday } = useCountdown();
+  const locked = CONFIG.lockUntilBirthday && !isBirthday;
+
+  return (
+    <div className="bw-up flex w-full max-w-xl flex-col items-center gap-3 text-center">
+      {isBirthday && <Confetti count={70} />}
+
+      <CurvedText
+        text={isBirthday ? "It's the big day!" : CONFIG.countdownTitle}
+        curve="arch"
+        size={isBirthday ? 56 : 42}
+        rotate={-5}
+      />
+
+      <h1 className="bw-script -mt-4 text-5xl leading-tight text-red-700 sm:-mt-6 sm:text-7xl">
+        {CONFIG.name}
+      </h1>
+      <p className="bw-font -mt-2 text-2xl font-bold text-gray-900 sm:text-4xl">
+         {CONFIG.birthday.label} 🎂
+      </p>
+
+      <div className="mt-2 flex items-center justify-center gap-2 sm:gap-4">
+        <CountTile value={days} label="Days" />
+        <CountTile value={hours} label="Hours" />
+        <CountTile value={mins} label="Mins" />
+        <CountTile value={secs} label="Secs" />
+      </div>
+
+      {/* song option */}
+      {song.available && (
+        <button
+          onClick={song.toggle}
+          className="bw-font mt-3 flex items-center gap-2 rounded-full border-2 border-red-600 bg-white/85 px-5 py-1.5 text-lg
+            font-bold text-red-700 shadow transition hover:scale-105 hover:bg-red-600 hover:text-white active:scale-95 sm:text-2xl"
+        >
+          <span className={song.playing ? "bw-spin" : ""}>{song.playing ? "⏸" : "🎵"}</span>
+          {song.playing ? "Pause song" : "Play birthday song"}
+          <span className="hidden text-base opacity-70 sm:inline">· {CONFIG.song.title}</span>
+        </button>
+      )}
+
+      <div className="mt-2">
+        <PillButton onClick={onStart} disabled={locked}>
+          {locked ? "Wait for the day 🔒" : "Start 🎁"}
+        </PillButton>
+      </div>
+    </div>
+  );
+};
 
 /* ---------- Step 1: question screen ---------- */
 
@@ -356,12 +475,13 @@ const CardStep = ({ onNext }) => {
         <div className="relative pl-1 pt-6 sm:pl-6">
           <Sparkle className="-top-1 left-14 text-xl sm:text-3xl" />
           <Sparkle className="left-1 top-4 text-sm sm:text-base" />
-          <p className="font-serif text-lg font-semibold tracking-[0.35em] text-red-700 sm:text-2xl">HAPPY</p>
-          <h1 className="bw-script -mt-2 text-6xl leading-none text-red-700 sm:text-8xl">Birthday</h1>
+          <p className="font-serif text-lg font-semibold tracking-[0.35em] text-gray-900 sm:text-2xl">HAPPY</p>
+          <h1 className="bw-script -mt-2 text-6xl leading-none text-gray-900 sm:text-8xl">Birthday</h1>
           <p className="mt-3 max-w-xs text-xs leading-relaxed text-stone-700 sm:text-sm">{c.text}</p>
+          <p className="bw-font mt-2 text-lg font-bold text-red-700 sm:text-2xl"> {CONFIG.birthday.label}</p>
 
           <div
-            className="mt-5 inline-block -rotate-2 bg-red-700 px-9 py-2 text-lg font-bold text-white shadow-md sm:text-2xl"
+            className="mt-4 inline-block -rotate-2 bg-red-700 px-9 py-2 text-lg font-bold text-white shadow-md sm:text-2xl"
             style={{ clipPath: "polygon(0 0, 100% 0, 93% 50%, 100% 100%, 0 100%, 7% 50%)" }}
           >
             <span className="bw-font">{CONFIG.name}</span>
@@ -538,23 +658,24 @@ const RansomTitle = ({ text }) => (
 
 const MemoriesStep = ({ onBack }) => {
   const m = CONFIG.memories;
-  const rots = [-4, 3, -2, 4, -3];
-  const drops = [0, 14, 2, 12, 0];
+  const rots = [-4, 3, -2, 4, -3, 2];
+  const drops = [0, 14, 2, 12, 0, 10];
   return (
     <div className="bw-up relative flex w-full max-w-5xl flex-col items-center gap-5">
       <RansomTitle text={m.title} />
 
       <div className="relative w-full">
-        {/* red string (desktop) */}
-        <svg viewBox="0 0 1000 80" preserveAspectRatio="none" className="absolute left-0 top-2 hidden h-16 w-full sm:block">
+        {/* red string (large screens, where all photos sit in one row) */}
+        <svg viewBox="0 0 1000 80" preserveAspectRatio="none" className="absolute left-0 top-2 hidden h-16 w-full lg:block">
           <path d="M0 10 Q 250 70 500 30 T 1000 20" stroke="#b91c1c" strokeWidth="3" fill="none" />
         </svg>
 
-        <div className="flex flex-wrap justify-center gap-5 pt-6 sm:flex-nowrap sm:gap-3 sm:pt-8">
+        {/* phone: 2 per row · tablet: 3 per row · desktop: all in one row */}
+        <div className="flex flex-wrap justify-center gap-5 pt-6 sm:gap-6 lg:flex-nowrap lg:gap-3 lg:pt-8">
           {m.photos.map((p, i) => (
             <div
               key={i}
-              className="relative w-[42%] sm:w-1/5"
+              className="relative w-[42%] sm:w-[28%] lg:w-[15%]"
               style={{ transform: `rotate(${rots[i % rots.length]}deg)`, marginTop: drops[i % drops.length] }}
             >
               {/* clothespin */}
@@ -621,51 +742,97 @@ const CakeStep = ({ onBack }) => {
   );
 };
 
-/* ---------- Final: message + wishes ---------- */
+/* ---------- Final: handwritten paper letter ---------- */
+
+// zig-zag "torn paper" bottom edge
+const TORN_EDGE = `polygon(0 0, 100% 0, ${Array.from({ length: 25 }, (_, i) => `${100 - i * 4}% ${i % 2 ? 98.2 : 100}%`).join(", ")}, 0 100%)`;
+
+// real-paper look: ruled lines + red margin line + soft stains + paper grain
+const PAPER_STYLE = {
+  backgroundColor: "#fffdf5",
+  backgroundImage: [
+    "linear-gradient(to right, transparent 44px, rgba(220,38,38,.35) 44px, rgba(220,38,38,.35) 46px, transparent 46px)",
+    "repeating-linear-gradient(to bottom, transparent 0, transparent 31px, rgba(96,165,250,.38) 31px, rgba(96,165,250,.38) 32px)",
+    "radial-gradient(circle at 85% 12%, rgba(217,119,6,.10), transparent 38%)",
+    "radial-gradient(circle at 10% 90%, rgba(217,119,6,.10), transparent 40%)",
+    "repeating-linear-gradient(45deg, rgba(120,90,40,.025) 0, rgba(120,90,40,.025) 2px, transparent 2px, transparent 5px)",
+  ].join(", "),
+  backgroundPosition: "0 0, 0 0, 0 0, 0 0, 0 0",
+  backgroundSize: "100% 100%, 100% 100%, 100% 100%, 100% 100%, auto",
+  clipPath: TORN_EDGE,
+};
 
 const RevealStep = ({ restart }) => {
-  const typed = useTypewriter(CONFIG.message);
+  const typed = useTypewriter(CONFIG.message, 40);
   const done = typed.length === CONFIG.message.length;
   const [shown, setShown] = useState(0);
 
   useEffect(() => {
     if (!done || shown >= CONFIG.wishes.length) return;
-    const t = setTimeout(() => setShown((s) => s + 1), 500);
+    const t = setTimeout(() => setShown((s) => s + 1), 450);
     return () => clearTimeout(t);
   }, [done, shown]);
 
+  const allShown = shown >= CONFIG.wishes.length;
+  const chipRot = [-3, 2, -2, 3];
+
   return (
-    <div className="bw-up flex w-full max-w-2xl flex-col items-center gap-4 text-center">
+    <div className="bw-up flex w-full max-w-md flex-col items-center gap-5 sm:max-w-lg">
       <Confetti count={90} />
-      <h2 className="bw-script text-5xl text-red-700 sm:text-7xl">Dear {CONFIG.name} 💖</h2>
 
-      <p className="min-h-[120px] max-w-xl rounded-3xl bg-white/80 p-4 text-base leading-relaxed text-stone-700 shadow sm:min-h-[110px] sm:p-6 sm:text-xl">
-        {typed}
-        {!done && <span className="animate-pulse">|</span>}
-      </p>
+      {/* wrapper carries the drop shadow (clip-path would cut a box-shadow) */}
+      <div className="relative w-full -rotate-1" style={{ filter: "drop-shadow(0 16px 16px rgba(0,0,0,.28))" }}>
+        {/* tape */}
+        <span className="absolute -top-3 left-6 z-20 h-6 w-20 -rotate-6 bg-amber-200/80 shadow-sm ring-1 ring-amber-300/60" />
+        <span className="absolute -top-3 right-6 z-20 h-6 w-20 rotate-6 bg-amber-200/80 shadow-sm ring-1 ring-amber-300/60" />
 
-      <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-2">
-        {CONFIG.wishes.map((w, i) => (
-          <div
-            key={w.title}
-            className={`rounded-2xl border-2 border-red-200 bg-white/90 p-4 text-left shadow transition-all duration-700 ${
-              i < shown ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
+        {/* paper */}
+        <div className="relative pb-6 pl-[60px] pr-5 pt-4" style={PAPER_STYLE}>
+          {/* postage stamp */}
+          <div className="absolute right-4 top-4 flex h-16 w-14 rotate-6 flex-col items-center justify-center border-2 border-dashed border-red-500 bg-red-50 text-2xl sm:h-20 sm:w-16">
+            🎂
+            <span className="bw-font text-[10px] font-bold leading-none text-red-600">BDAY</span>
+          </div>
+
+          {/* date, written on the first ruled line */}
+          <p className="bw-font text-xl text-red-400" style={{ lineHeight: "32px" }}>
+            {CONFIG.birthday.label}
+          </p>
+
+          {/* "Dear ..." (2 ruled lines tall) */}
+          <h2 className="bw-script pr-20 text-5xl leading-[64px] text-red-700 sm:text-6xl">Dear {CONFIG.name}</h2>
+
+          {/* handwriting, locked to the ruled lines (32px) */}
+          <p className="bw-font min-h-[128px] text-red-900" style={{ fontSize: 24, lineHeight: "32px" }}>
+            {typed}
+            {!done && <span className="animate-pulse">|</span>}
+          </p>
+
+          {/* short wish stickers (no long text) */}
+          <div className="mt-4 flex flex-wrap gap-2.5">
+            {CONFIG.wishes.map((w, i) => (
+              <span
+                key={w.title}
+                className={`bw-font rounded-full border-2 border-dashed border-red-300 bg-white px-3 py-1 text-xl text-red-600 shadow-sm transition-all duration-500 ${
+                  i < shown ? "scale-100 opacity-100" : "scale-50 opacity-0"
+                }`}
+                style={{ transform: i < shown ? `rotate(${chipRot[i % chipRot.length]}deg)` : undefined }}
+              >
+                {w.emoji} {w.title}
+              </span>
+            ))}
+          </div>
+
+          {/* signature */}
+          <p
+            className={`bw-script mt-3 text-right text-4xl leading-[64px] text-red-700 transition-opacity duration-700 sm:text-5xl ${
+              allShown ? "opacity-100" : "opacity-0"
             }`}
           >
-            <div className="text-3xl">{w.emoji}</div>
-            <h3 className="bw-font text-xl font-bold text-red-600">{w.title}</h3>
-            <p className="text-sm text-stone-600">{w.text}</p>
-          </div>
-        ))}
+            Love, {CONFIG.from} 🤗
+          </p>
+        </div>
       </div>
-
-      <p
-        className={`bw-font mt-2 text-xl text-red-700 transition-opacity duration-700 sm:text-2xl ${
-          shown >= CONFIG.wishes.length ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        With lots of love, {CONFIG.from} 🤗
-      </p>
 
       <button onClick={restart} className="text-sm text-stone-500 underline underline-offset-4 hover:text-red-500">
         🔁 Watch again
@@ -677,16 +844,35 @@ const RevealStep = ({ restart }) => {
 /* ---------- Main ---------- */
 
 const BirthdayWish = () => {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(0); // 0 = countdown
   const [sub, setSub] = useState(null); // "wish" | "memories" | "cake" | null (inside the gift screen)
   const [opened, setOpened] = useState([]);
 
+  // ----- song -----
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [songOk, setSongOk] = useState(Boolean(CONFIG.song && CONFIG.song.src));
+
+  const playSong = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => {});
+  };
+  const pauseSong = () => audioRef.current && audioRef.current.pause();
+  const toggleSong = () => (playing ? pauseSong() : playSong());
+
+  // ----- steps -----
   const asks = CONFIG.asks;
-  const cardIdx = asks.length;
-  const giftsIdx = asks.length + 1;
-  const total = asks.length + 3; // asks + card + gifts + final
+  const cardIdx = asks.length + 1; // 0 = countdown, 1..n = questions
+  const giftsIdx = asks.length + 2;
+  const total = asks.length + 4; // countdown + asks + card + gifts + final
 
   const next = () => setStep((s) => Math.min(s + 1, total - 1));
+  const start = () => {
+    if (songOk && !playing) playSong(); // user tapped → browser allows sound
+    next();
+  };
   const openGift = (id) => {
     setSub(id);
     setOpened((o) => (o.includes(id) ? o : [...o, id]));
@@ -698,7 +884,8 @@ const BirthdayWish = () => {
   };
 
   let content;
-  if (step < cardIdx) content = <AskStep step={asks[step]} onYes={next} />;
+  if (step === 0) content = <CountdownStep onStart={start} song={{ available: songOk, playing, toggle: toggleSong }} />;
+  else if (step <= asks.length) content = <AskStep step={asks[step - 1]} onYes={next} />;
   else if (step === cardIdx) content = <CardStep onNext={next} />;
   else if (step === giftsIdx) {
     if (sub === "wish") content = <WishStep onBack={() => setSub(null)} />;
@@ -731,30 +918,38 @@ const BirthdayWish = () => {
         @keyframes bw-pulse { 0%,100% { transform: scale(1);} 50% { transform: scale(1.12);} }
         @keyframes bw-wiggle { 0%,100% { transform: rotate(-4deg);} 50% { transform: rotate(4deg) translateY(-6px);} }
         @keyframes bw-flicker { 0%,100% { transform: scale(1) rotate(-3deg);} 50% { transform: scale(1.2) rotate(3deg);} }
+        @keyframes bw-pop { 0% { transform: scale(1.35); opacity:.4;} 100% { transform: scale(1); opacity:1;} }
+        @keyframes bw-spin { to { transform: rotate(360deg); } }
         .bw-up { animation: bw-up .6s ease both; }
         .bw-float { animation: bw-float 3s ease-in-out infinite; }
         .bw-pulse { animation: bw-pulse 1.4s ease-in-out infinite; }
         .bw-wiggle { animation: bw-wiggle 1.6s ease-in-out infinite; }
         .bw-flicker { animation: bw-flicker .6s ease-in-out infinite; }
+        .bw-pop { display: inline-block; animation: bw-pop .35s ease both; }
+        .bw-spin { display: inline-block; animation: bw-spin 3s linear infinite; }
         .bw-fall { animation-name: bw-fall; animation-timing-function: linear; animation-iteration-count: infinite; }
         .bw-rise { animation-name: bw-rise; animation-timing-function: linear; animation-iteration-count: infinite; }
         .bw-sway { transform-origin: top center; animation: bw-sway 3s ease-in-out infinite; }
       `}</style>
 
+      {/* birthday song (add your mp3 to /public and set CONFIG.song.src) */}
+      {CONFIG.song && CONFIG.song.src && (
+        <audio
+          ref={audioRef}
+          src={CONFIG.song.src}
+          loop
+          preload="auto"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onError={() => setSongOk(false)}
+        />
+      )}
+
       <RisingBalloons />
       <Corners />
 
-      {/* progress dots */}
-      <div className="fixed top-4 z-30 flex gap-2 sm:top-6">
-        {Array.from({ length: total }).map((_, i) => (
-          <span
-            key={i}
-            className={`h-2 rounded-full transition-all duration-500 ${
-              i === step ? "w-7 bg-red-600" : i < step ? "w-2 bg-red-400" : "w-2 bg-red-200"
-            }`}
-          />
-        ))}
-      </div>
+      {/* floating song button on every screen after the countdown */}
+      {songOk && step > 0 && <SongFloat playing={playing} onToggle={toggleSong} />}
 
       <div key={`${step}-${sub}`} className="relative z-10 flex w-full justify-center">
         {content}
