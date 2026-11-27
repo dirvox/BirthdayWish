@@ -8,7 +8,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
    Tip: PNG with transparent background looks best on the question screens.
 */
 const CONFIG = {
-  name: "Babuu..",
+  name: "Betu",
   from: "Shalini",
 
   // 0) BIRTHDAY DATE + COUNTDOWN (first screen)
@@ -23,7 +23,7 @@ const CONFIG = {
     title: "Happy Birthday 💖",
   },
 
-  // 1) QUESTION SCREENS (curved text + image + buttons)
+  // 1) QUESTION SC REENS (curved text + image + buttons)
   asks: [
     {
       top: "I have made something for you", // curved text ABOVE the image
